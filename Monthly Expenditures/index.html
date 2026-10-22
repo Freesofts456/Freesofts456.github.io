@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2b705">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>බස් ගාස්තු සටහන</title>
+<style>
+:root{--paper:#f6f4ec;--ink:#1d2327;--mute:#5d676c;--line:#d6d2c4;--bus:#f2b705;--ok:#1d6b4a;--bad:#b3261e;--card:#fffdf7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:1rem/1.5 system-ui,-apple-system,"Noto Sans Sinhala","Iskoola Pota",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:32rem;margin:0 auto;padding:0 1rem 3rem}
+header{background:var(--bus);border-bottom:3px solid var(--ink);padding:.9rem 1rem}
+header h1{margin:0;font-size:1.25rem;max-width:32rem;margin:0 auto}
+.month{display:flex;align-items:center;justify-content:space-between;margin:1rem 0}
+.month b{font-size:1.15rem}
+button,input{font:inherit}
+.icon{width:2.8rem;height:2.8rem;border:2px solid var(--ink);background:var(--card);font-size:1.3rem;cursor:pointer}
+.ticket{background:var(--card);border:2px solid var(--ink);padding:1rem 1.1rem;position:relative}
+.ticket small{display:block;color:var(--mute)}
+.bal{font-size:2.4rem;font-weight:800;line-height:1.1;margin:.1rem 0 .6rem}
+.bal.neg{color:var(--bad)}
+.bar{height:.7rem;background:#e6e2d2;border:1px solid var(--ink)}
+.bar i{display:block;height:100%;background:var(--ink);width:0}
+.bar.over i{background:var(--bad)}
+.row{display:flex;justify-content:space-between;gap:1rem;margin-top:.8rem;border-top:2px dashed var(--line);padding-top:.7rem}
+.row div{flex:1}
+.row b{font-size:1.15rem}
+h2{font-size:1.05rem;margin:1.6rem 0 .6rem}
+label{display:block;font-weight:600;margin:.7rem 0 .2rem}
+input{width:100%;padding:.65rem .7rem;border:2px solid var(--ink);background:#fff;border-radius:0}
+input:focus-visible,button:focus-visible{outline:3px solid var(--bus);outline-offset:2px}
+.inline{display:flex;gap:.5rem}
+.inline input{flex:1}
+.btn{background:var(--ink);color:#fff;border:2px solid var(--ink);padding:.65rem 1.1rem;font-weight:700;cursor:pointer}
+.btn.full{width:100%;margin-top:1rem;background:var(--bus);color:var(--ink)}
+ul{list-style:none;margin:0;padding:0;border:2px solid var(--ink);background:var(--card)}
+li{display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;border-bottom:1px solid var(--line)}
+li:last-child{border-bottom:0}
+li .d{flex:1;min-width:0}
+li .d span{display:block;color:var(--mute);font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+li .a{font-weight:700}
+li button{background:none;border:0;color:var(--bad);cursor:pointer;padding:.4rem;font-weight:600}
+.empty{color:var(--mute);padding:1rem;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>බස් ගාස්තු සටහන</h1></header>
+<div class="wrap">
+<div class="month"><button class="icon" id="prev" aria-label="පෙර මාසය">‹</button><b id="mname"></b><button class="icon" id="next" aria-label="ඊළඟ මාසය">›</button></div>
+
+<div class="ticket">
+<small>ඉතිරි ශේෂය</small>
+<div class="bal" id="bal">Rs. 0.00</div>
+<div class="bar" id="bar"><i id="fill"></i></div>
+<div class="row"><div><small>මාසික වෙන්කිරීම</small><b id="alloc">Rs. 0.00</b></div><div><small>වියදම් කළ මුදල</small><b id="spent">Rs. 0.00</b></div><div><small>ගාස්තු ගණන</small><b id="count">0</b></div></div>
+</div>
+
+<h2>මාසික වෙන්කිරීම</h2>
+<label for="ain">මුළු මුදල (රු.)</label>
+<div class="inline"><input id="ain" type="number" inputmode="decimal" min="0" step="any" placeholder="උදා: 5000"><button class="btn" id="asave">සුරකින්න</button></div>
+
+<h2>බස් ගාස්තුවක් එකතු කරන්න</h2>
+<label for="amt">මුදල (රු.)</label>
+<input id="amt" type="number" inputmode="decimal" min="0" step="any" placeholder="උදා: 60">
+<label for="dt">දිනය</label>
+<input id="dt" type="date">
+<label for="note">සටහන (මාර්ගය)</label>
+<input id="note" type="text" placeholder="උදා: ගෙදර සිට විශ්වවිද්‍යාලයට">
+<button class="btn full" id="add">එකතු කරන්න</button>
+
+<h2>මෙම මාසයේ ගාස්තු</h2>
+<ul id="list"></ul>
+</div>
+<script>
+var KEY="busfare.v1",db={},cur=new Date();cur.setDate(1);
+function load(){try{db=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){db={}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert("දත්ත සුරැකීමට නොහැකි විය.")}}
+function mk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
+function today(){var t=new Date();return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0")}
+function rs(n){return"Rs. "+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function month(){var k=mk(cur);if(!db[k])db[k]={alloc:0,entries:[]};return db[k]}
+function $(id){return document.getElementById(id)}
+function render(){
+  var m=month(),spent=m.entries.reduce(function(s,e){return s+e.amount},0),bal=m.alloc-spent;
+  var nm;try{nm=cur.toLocaleDateString("si-LK",{month:"long",year:"numeric"})}catch(e){nm=mk(cur)}
+  $("mname").textContent=nm;
+  $("bal").textContent=rs(bal);$("bal").className="bal"+(bal<0?" neg":"");
+  $("alloc").textContent=rs(m.alloc);$("spent").textContent=rs(spent);$("count").textContent=m.entries.length;
+  var p=m.alloc>0?Math.min(100,spent/m.alloc*100):(spent>0?100:0);
+  $("fill").style.width=p+"%";$("bar").className="bar"+(bal<0?" over":"");
+  $("ain").value=m.alloc||"";
+  var ul=$("list");ul.innerHTML="";
+  if(!m.entries.length){var li=document.createElement("li");li.className="empty";li.textContent="තවම ගාස්තු නැත. ඉහත පෝරමයෙන් පළමු ගාස්තුව එකතු කරන්න.";ul.appendChild(li);return}
+  m.entries.slice().sort(function(a,b){return a.date<b.date?1:-1}).forEach(function(e){
+    var li=document.createElement("li"),d=document.createElement("div"),a=document.createElement("div"),b=document.createElement("button");
+    d.className="d";d.innerHTML="<b></b><span></span>";d.firstChild.textContent=e.date;d.lastChild.textContent=e.note||"";
+    a.className="a";a.textContent=rs(e.amount);
+    b.textContent="මකන්න";b.onclick=function(){if(confirm("මෙම සටහන මකන්නද?")){m.entries=m.entries.filter(function(x){return x.id!==e.id});save();render()}};
+    li.appendChild(d);li.appendChild(a);li.appendChild(b);ul.appendChild(li)});
+}
+$("prev").onclick=function(){cur.setMonth(cur.getMonth()-1);render()};
+$("next").onclick=function(){cur.setMonth(cur.getMonth()+1);render()};
+$("asave").onclick=function(){var v=parseFloat($("ain").value);if(isNaN(v)||v<0){alert("නිවැරදි මුදලක් ඇතුළත් කරන්න.");return}month().alloc=v;save();render()};
+$("add").onclick=function(){var v=parseFloat($("amt").value);if(isNaN(v)||v<=0){alert("නිවැරදි මුදලක් ඇතුළත් කරන්න.");return}
+  var d=$("dt").value||today(),m=month();
+  var k=d.slice(0,7);if(k!==mk(cur)){if(!db[k])db[k]={alloc:0,entries:[]};m=db[k]}
+  m.entries.push({id:Date.now(),date:d,amount:v,note:$("note").value.trim()});
+  save();$("note").value="";render()};
+$("dt").value=today();
+load();render();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+</script>
+</body>
+</html>
